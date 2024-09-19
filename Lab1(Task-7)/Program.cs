@@ -33,15 +33,15 @@ numbers.Push(8);
 numbers.Push(-3);
 numbers.Push(9);
 
-var positiveNumbers = numbers
+var evenNumbers = numbers
     .Where(x => x > 0 && x % 2 == 0)
     .Sum();
 
-if (positiveNumbers > 0)
+if (evenNumbers > 0)
 {
-    Console.WriteLine($"Positive total amount: {positiveNumbers}");
+    Console.WriteLine($"Even numbers total amount: {evenNumbers}");
 }
 else
 {
-    Console.WriteLine("Positive numbers not found.");
+    Console.WriteLine("Even numbers not found.");
 }
