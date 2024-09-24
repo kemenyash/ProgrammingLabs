@@ -6,8 +6,8 @@ var hotelService = new HotelService();
 
 var visitors = new List<Visitor>
 {
-    new Visitor { FullName = "Serhiy Vasylenko", RoomNumber = 101, SettlementTime = new DateTime(2024, 9, 12), EvictionTime = new DateTime(2024, 9, 30) },
-    new Visitor { FullName = "Andriy Petrenko", RoomNumber = 101, SettlementTime = new DateTime(2024, 9, 13), EvictionTime = new DateTime(2024, 9, 30) },
+    new Visitor { FullName = "Serhiy Vasylenko", RoomNumber = 101, SettlementTime = new DateTime(2023, 9, 12), EvictionTime = new DateTime(2023, 9, 14) },
+    new Visitor { FullName = "Andriy Petrenko", RoomNumber = 101, SettlementTime = new DateTime(2023, 9, 12), EvictionTime = new DateTime(2023, 9, 15)  },
     new Visitor { FullName = "Olena Ivanova", RoomNumber = 102, SettlementTime = new DateTime(2024, 9, 14), EvictionTime = new DateTime(2024, 10, 15) },
     new Visitor { FullName = "Vasyl Shevchenko", RoomNumber = 201, SettlementTime = new DateTime(2024, 9, 17), EvictionTime = new DateTime(2024, 10, 10) },
     new Visitor { FullName = "Iryna Bondar", RoomNumber = 202, SettlementTime = new DateTime(2024, 9, 16), EvictionTime = new DateTime(2024, 10, 5) },
@@ -35,8 +35,9 @@ var rooms = new List<Room>
 };
 #endregion
 
-
-hotelService.GetFloorsWithSmallAmountRooms(rooms);
 hotelService.GetStatByHotelRoom(visitors, 101);
+Console.WriteLine();
+hotelService.GetFloorsWithSmallAmountRooms(rooms);
+Console.WriteLine();
 hotelService.CalculatePaymentForCurrentVisitors(visitors, rooms);
 
