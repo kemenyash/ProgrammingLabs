@@ -2,11 +2,9 @@
 using StudentsManagement.Models;
 
 #region Initialization
-var path = "Student.xml";
-var xmlHelper = new XMLHelper();
-var students = new StudentsRoot
-{
-    Students = new List<Student>
+var path = "Student.json";
+var jsonHelper = new JsonHelper();
+var students = new List<Student>
     {
         new Student
         {
@@ -139,7 +137,7 @@ var students = new StudentsRoot
             Scholarship = 700,
             Rating = new List<Rating>
             {
-                Rating.NotVery, 
+                Rating.NotVery,
                 Rating.Well
             }
         },
@@ -169,23 +167,22 @@ var students = new StudentsRoot
             Scholarship = 0,
             Rating = new List<Rating>
             {
-                Rating.Bad, 
+                Rating.Bad,
                 Rating.NotVery
             }
         },
 
-    }
-};
+    };
 #endregion
 
 //створюємо файл на базі students-списку
-xmlHelper.CreateXmlFile<StudentsRoot>(path, students);
+jsonHelper.CreateJsonFile<List<Student>>(path, students);
 
 //створюємо рутовий об'єкт, в який десеріалізуємо файл
-var studentsRoot = xmlHelper.GetRoot<StudentsRoot>(path);
+var studentsDeserialized = jsonHelper.DeserializeJsonFile<List<Student>>(path);
 
 //ініціалізуємо хелпер з допомогою рутового об'єкту, який десеріалізували
-var studentsPresentationHelper = new StudentsPresentationHelper(studentsRoot);
+var studentsPresentationHelper = new StudentsPresentationHelper(studentsDeserialized);
 
 //показуємо всіх студентів
 studentsPresentationHelper.ShowAll();

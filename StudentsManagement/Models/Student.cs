@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -9,24 +10,24 @@ namespace StudentsManagement.Models
 {
     public class Student
     {
-        [XmlElement("FirstName")]
+        [JsonProperty("FirstName")]
         public string FirstName { get; set; }
 
-        [XmlElement("LastName")]
+        [JsonProperty("LastName")]
         public string LastName { get; set; }
 
-        [XmlElement("Gender")]
+        [JsonProperty("Gender")]
         public Gender Gender { get; set; }
 
-        [XmlElement("Scholarship")]
+        [JsonProperty("Scholarship")]
         public decimal Scholarship { get; set; }
 
-        [XmlElement("Faculty")]
+        [JsonProperty("Faculty")]
         public Faculty Faculty { get; set; }
 
-        [XmlElement("Course")]
+        [JsonProperty("Course")]
         public Course Course { get; set; }
-        [XmlElement("Rating")]
+        [JsonProperty("Rating")]
         public List<Rating> Rating { get; set; }
     }
 }

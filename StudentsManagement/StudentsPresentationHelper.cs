@@ -9,14 +9,14 @@ namespace StudentsManagement
 {
     public class StudentsPresentationHelper
     {
-        private readonly StudentsRoot root;
+        private readonly List<Student> students;
 
-        public StudentsPresentationHelper(StudentsRoot root) => this.root = root;
+        public StudentsPresentationHelper(List<Student> students) => this.students = students;
 
         public void ShowAll()
         {
-            if (root is null) return;
-            foreach (var student in root.Students) 
+            if (students is null) return;
+            foreach (var student in students) 
             {
                 Console.WriteLine($"Full name: {student.FirstName} {student.LastName}");
                 Console.WriteLine($"Gender {student.Gender}");
@@ -30,10 +30,10 @@ namespace StudentsManagement
 
         public void ShowRatingAndScholarship(string lastName)
         {
-            if (root is null) return;
+            if (students is null) return;
             if(string.IsNullOrEmpty(lastName)) return;
 
-            var student = root.Students.FirstOrDefault(x => 
+            var student = students.FirstOrDefault(x => 
                                        x.LastName.ToLower() == lastName.ToLower());
             if(student is null)
             {
@@ -48,8 +48,8 @@ namespace StudentsManagement
 
         public void ShowStudents(Faculty faculty, Course course, Rating rating, Gender gender)
         {
-            if (root is null) return;
-            var students = root.Students.FindAll(x => x.Faculty == faculty && x.Course == course);
+            if (this.students is null) return;
+            var students = this.students.FindAll(x => x.Faculty == faculty && x.Course == course);
             if(students is null)
             {
                 Console.WriteLine("Students not found on faculty and course");
