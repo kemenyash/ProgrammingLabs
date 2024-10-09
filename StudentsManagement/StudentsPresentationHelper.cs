@@ -1,68 +1,97 @@
-﻿using StudentsManagement.Models;
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using StudentsManagement;
 
-namespace StudentsManagement
+public class StudentsPresentationHelper
 {
-    public class StudentsPresentationHelper
+    private readonly DBHelper dbHelper;
+
+    public StudentsPresentationHelper(DBHelper dbHelper)
     {
-        private readonly StudentsRoot root;
+        this.dbHelper = dbHelper;
+    }
 
-        public StudentsPresentationHelper(StudentsRoot root) => this.root = root;
+    public void ShowAll()
+    {
+        string query = @"
+            SELECT s.FirstName, s.LastName, s.Gender, s.Scholarship, c.CourseNumber, f.Name as Faculty
+            FROM Students s
+            JOIN Courses c ON s.CourseId = c.CourseId
+            JOIN Faculties f ON s.FacultyId = f.FacultyId";
 
-        public void ShowAll()
+        var students = dbHelper.ExecuteSelectQuery(query);
+
+        foreach (var student in students)
         {
-            if (root is null) return;
-            foreach (var student in root.Students) 
+            Console.WriteLine($"Full name: {student["FirstName"]} {student["LastName"]}");
+            Console.WriteLine($"Gender: {student["Gender"]}");
+            Console.WriteLine($"Course: {student["CourseNumber"]}");
+            Console.WriteLine($"Faculty: {student["Faculty"]}");
+            Console.WriteLine($"Scholarship: {student["Scholarship"]}\r\n\r\n");
+        }
+    }
+
+    public void ShowRatingAndScholarship(string lastName)
+    {
+        string query = @"
+            SELECT s.FirstName, s.LastName, s.Scholarship, r.Grade
+            FROM Students s
+            LEFT JOIN Ratings r ON s.StudentId = r.StudentId
+            WHERE s.LastName = @LastName";
+
+        var parameters = new Dictionary<string, object>
+        {
+            { "@LastName", lastName }
+        };
+
+        var students = dbHelper.ExecuteSelectQuery(query, parameters);
+
+        if (students.Count == 0)
+        {
+            Console.WriteLine("Student not found");
+        }
+        else
+        {
+            foreach (var student in students)
             {
-                Console.WriteLine($"Full name: {student.FirstName} {student.LastName}");
-                Console.WriteLine($"Gender {student.Gender}");
-                Console.WriteLine($"Rating: {string.Join(", ", student.Rating
-                    .Select(x =>  ((int)x).ToString()))}");
-                Console.WriteLine($"Course: {student.Course}");
-                Console.WriteLine($"Faculty: {student.Faculty}");
-                Console.WriteLine($"Scholarship: {student.Scholarship}\r\n\r\n");
+                Console.WriteLine($"Rating of student {student["FirstName"]} {student["LastName"]}: {student["Grade"]}");
+                Console.WriteLine($"Scholarship: {student["Scholarship"]}\r\n\r\n");
             }
         }
+    }
 
-        public void ShowRatingAndScholarship(string lastName)
+    public void ShowStudents(string faculty, int course, decimal rating, string gender)
+    {
+        string query = @"
+            SELECT s.FirstName, s.LastName
+            FROM Students s
+            JOIN Faculties f ON s.FacultyId = f.FacultyId
+            JOIN Courses c ON s.CourseId = c.CourseId
+            LEFT JOIN Ratings r ON s.StudentId = r.StudentId
+            WHERE f.Name = @Faculty AND c.CourseNumber = @Course AND r.Grade = @Rating AND s.Gender = @Gender";
+
+        var parameters = new Dictionary<string, object>
         {
-            if (root is null) return;
-            if(string.IsNullOrEmpty(lastName)) return;
+            { "@Faculty", faculty },
+            { "@Course", course },
+            { "@Rating", rating },
+            { "@Gender", gender }
+        };
 
-            var student = root.Students.FirstOrDefault(x => 
-                                       x.LastName.ToLower() == lastName.ToLower());
-            if(student is null)
-            {
-                Console.WriteLine("Student not found");
-                return;
-            }
+        var students = dbHelper.ExecuteSelectQuery(query, parameters);
 
-            Console.WriteLine($"Rating of student {student.FirstName} {student.LastName}: {string.Join(", ", student.Rating
-                    .Select(x => ((int)x).ToString()))}");
-            Console.WriteLine($"Scholarship: {student.Scholarship}\r\n\r\n");
+        if (students.Count == 0)
+        {
+            Console.WriteLine("Students not found on faculty and course");
         }
-
-        public void ShowStudents(Faculty faculty, Course course, Rating rating, Gender gender)
+        else
         {
-            if (root is null) return;
-            var students = root.Students.FindAll(x => x.Faculty == faculty && x.Course == course);
-            if(students is null)
+            var studentNames = new List<string>();
+            foreach (var student in students)
             {
-                Console.WriteLine("Students not found on faculty and course");
-                return;
+                studentNames.Add($"{student["FirstName"]} {student["LastName"]}");
             }
-
-            var studentsWithTheSameRating = students.Where(x => x.Gender == gender && x.Rating.Contains(rating))
-                .Select(x => $"{x.FirstName} {x.LastName}");
-
-            Console.WriteLine($"Students on faculty {faculty} and " +
-                $"{course} course with rating {(int)rating}: " +
-                $"{string.Join(", ", studentsWithTheSameRating)}");
-
+            Console.WriteLine($"Students on faculty {faculty} and {course} course with rating {rating}: {string.Join(", ", studentNames)}");
         }
     }
 }
