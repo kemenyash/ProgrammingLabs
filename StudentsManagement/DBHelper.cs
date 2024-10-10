@@ -1,4 +1,6 @@
-﻿using System;
+﻿using DataStore;
+using Schemas;
+using System;
 using System.Collections.Generic;
 using System.Data.SqlClient;
 
@@ -6,179 +8,232 @@ namespace StudentsManagement
 {
     public class DBHelper
     {
-        private readonly string connectionString;
-        private SqlConnection connection;
-        private bool isMockNeeded;
+
+        private readonly bool isMockNeeded;
+
+        #region Properties
+
+        public IEnumerable<Scholarship> Scholarships
+        {
+            get
+            {
+                using (var dataContext = new DataContext())
+                {
+                    return dataContext.Scholarships;
+                }
+            }
+        }
+
+        public IEnumerable<StudentsOnCourse> StudentsOnCourses
+        {
+            get
+            {
+                using (var dataContext = new DataContext())
+                {
+                    return dataContext.StudentsOnCourses;
+                }
+            }
+        }
+
+        public IEnumerable<DataStore.Assesment> Assesments
+        {
+            get
+            {
+                using(var dataContext = new DataContext())
+                {
+                    return dataContext.Assesments;
+                }
+            }
+        }
+
+        #endregion
 
         public DBHelper(bool isMockNeeded)
         {
             this.isMockNeeded = isMockNeeded;
-            connectionString = @"Data Source=(localdb)\MSSQLLocalDB;Initial Catalog=students;Integrated Security=True;";
-            connection = new SqlConnection(connectionString);
-            Initialization();
+            if (isMockNeeded) Initialization().ConfigureAwait(false);
         }
 
+        #region Initialization
 
-        public List<Dictionary<string, object>> ExecuteSelectQuery(string query, Dictionary<string, object> parameters = null)
+        private async Task Initialization()
         {
-            var result = new List<Dictionary<string, object>>();
+            await FacultiesInit();
+            await CoursesInit();
+            await StudentsInit();
+            await AssesmentInit();
+        }
 
-            using (var command = new SqlCommand(query, connection))
+        private async Task FacultiesInit()
+        {
+            var facultiesNames = new[]
             {
-                if (parameters != null)
-                {
-                    foreach (var param in parameters)
-                    {
-                        command.Parameters.AddWithValue(param.Key, param.Value);
-                    }
-                }
+                "Biologic",
+                "Geographic",
+                "Economical",
+                "Medical",
+                "MathAndDigitalTech"
+            };
 
-                using (var reader = command.ExecuteReader())
+            using (var dataContext = new DataContext())
+            {
+                //Ініціалізуємо список факультетів
+                for (int i = 0; i < facultiesNames.Length; i++) 
                 {
-                    while (reader.Read())
+                    await dataContext.Faculties.AddAsync(new Faculty { Name = facultiesNames[i] });
+                }
+                await dataContext.SaveChangesAsync();
+            }
+        }
+
+        private async Task CoursesInit()
+        {
+            using(var dataContext = new DataContext())
+            {
+
+                foreach (var faculty in dataContext.Faculties)
+                {
+                    //Додаємо по 4 курси на кожен факультет почиинаючи з 1-го і закінчуючи 4-им
+                    for(int i = 1; i < 5; i++)
                     {
-                        var row = new Dictionary<string, object>();
-                        for (int i = 0; i < reader.FieldCount; i++)
+                        await dataContext.Courses.AddAsync(new Course
                         {
-                            row[reader.GetName(i)] = reader.GetValue(i);
-                        }
-                        result.Add(row);
+                            FacultyId = faculty.Id,
+                            Value = i
+                        });
+                    }
+                }
+                await dataContext.SaveChangesAsync();
+            }
+        }
+
+        private async Task StudentsInit()
+        {
+            var studentsMaleMock = new Dictionary<string, string>
+            {
+                { "Koval", "Ivan" },
+                { "Marchuk", "Stepan" },
+                { "Kasian", "Vasyl" },
+                { "Savoliuk", "Mykhailo" },
+                { "Hromovych", "Andriy" },
+            };
+
+            var studentsFemaleMock = new Dictionary<string, string>
+            {
+                { "Koval", "Ivanna" },
+                { "Marchuk", "Stepanida" },
+                { "Kasian", "Vasylyna" },
+                { "Savoliuk", "Mykhailyna" },
+                { "Hromovych", "Andriana" },
+            };
+
+            using (var dataContext = new DataContext())
+            {
+
+                //Додаємо студентів на курси
+                foreach(var course in dataContext.Courses)
+                {
+                    //Ініціалізуємо студентів з допомогою списків, щоб після збережння мати їх id
+                    var studentsMaleData = studentsMaleMock.Select(x => new Student
+                    {
+                        FirstName = x.Key,
+                        LastName = x.Value,
+                        Gender = Schemas.Gender.Male
+                    });
+
+
+                    var studentsFemaleData = studentsFemaleMock.Select(x => new Student
+                    {
+                        Gender = Schemas.Gender.Female,
+                        FirstName = x.Key,
+                        LastName = x.Value,
+                    });
+
+                    await dataContext.Students.AddRangeAsync(studentsMaleData);
+                    await dataContext.Students.AddRangeAsync (studentsFemaleData);
+
+                    await dataContext.SaveChangesAsync();
+                    
+                    //Після збереження вибираємо id і робимо модель контексту для збереження в суміжній таблиці
+                    
+                    var femaleStudentsIds = studentsFemaleData.Select(x => new StudentsOnCourse
+                    {
+                        CourseId = course.Id,
+                        StudentId = x.Id
+                    });
+                    var maleStudentsIds = studentsMaleData.Select(x => new StudentsOnCourse
+                    {
+                        CourseId = course.Id,
+                        StudentId = x.Id
+                    });
+
+                    await dataContext.StudentsOnCourses.AddRangeAsync(femaleStudentsIds);
+                    await dataContext.StudentsOnCourses.AddRangeAsync(maleStudentsIds);
+
+                    await dataContext.SaveChangesAsync();
+                }                
+
+                
+            }
+        }
+
+        private async Task AssesmentInit()
+        {
+            using (var dataContext = new DataContext())
+            {
+                //отримуємо всі значення енумератора, щоб потім з масиву рандомно призначити студенту
+                var values = Enum.GetValues(typeof(Schemas.Assesment));
+
+                foreach (var student in dataContext.Students)
+                {
+                    //вибираємо 5 рандомних оцінок в список
+                    var assesments = new List<Schemas.Assesment>();
+                    for (int i = 0; i < 6; i++)
+                    {
+                        Random random = new Random();
+                        var assesment = (Schemas.Assesment)values.GetValue(random.Next(values.Length));
+                    }
+
+                    //пачкою зберігаємо оцінки студенту
+                    var assesmentsData = assesments.Select(x => new DataStore.Assesment
+                    {
+                        StudentId = student.Id,
+                        Value = x
+                    });
+
+                    await dataContext.Assesments.AddRangeAsync(assesmentsData);
+                    await dataContext.SaveChangesAsync();
+
+                }
+            }
+        }
+
+        private async Task ScholarshipInit()
+        {
+
+            using (var dataContext = new DataContext())
+            {
+                //всім студентам, які мають середній бал 4 і вище - даємо стипендію і відповідно додаємо в таблицю
+                foreach(var student in dataContext.Students)
+                {
+                    var assesments = dataContext.Assesments.Where(x => x.StudentId == student.Id).Select(a => a.Value);
+                    var average =  assesments.Average(a => (int)a);
+
+                    if (average > 4)
+                    {
+
+                        await dataContext.Scholarships.AddAsync(new Scholarship
+                        {
+                            StudentId = student.Id,
+                            Value = 1500
+                        });
+
+                        await dataContext.SaveChangesAsync();
                     }
                 }
             }
-
-            return result;
         }
 
-        #region Mocks and initialization
-        private void Initialization()
-        {
-            connection = new SqlConnection(connectionString);
-            connection.Open();
-
-            string checkDbQuery = "IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = 'students') BEGIN CREATE DATABASE students; END";
-            using (SqlCommand command = new SqlCommand(checkDbQuery, connection))
-            {
-                command.ExecuteNonQuery();
-            }
-
-            CreateTables();
-            if (isMockNeeded) InsertMockData();
-        }
-
-        private void CreateTables()
-        {
-            string useDbQuery = "USE students;";
-            using (SqlCommand command = new SqlCommand(useDbQuery, connection))
-            {
-                command.ExecuteNonQuery();
-            }
-
-            string createTablesQuery = @"
-        IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='Faculties' AND xtype='U')
-        BEGIN
-            CREATE TABLE Faculties (
-                FacultyId INT PRIMARY KEY IDENTITY(1,1),
-                Name NVARCHAR(100) NOT NULL
-            );
-        END;
-
-        IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='Courses' AND xtype='U')
-        BEGIN
-            CREATE TABLE Courses (
-                CourseId INT PRIMARY KEY IDENTITY(1,1),
-                CourseNumber INT NOT NULL
-            );
-        END;
-
-        IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='Students' AND xtype='U')
-        BEGIN
-            CREATE TABLE Students (
-                StudentId INT PRIMARY KEY IDENTITY(1,1),
-                FirstName NVARCHAR(50),
-                LastName NVARCHAR(50),
-                Gender NVARCHAR(10),
-                Scholarship DECIMAL(18, 2),
-                FacultyId INT FOREIGN KEY REFERENCES Faculties(FacultyId),
-                CourseId INT FOREIGN KEY REFERENCES Courses(CourseId)
-            );
-        END;
-
-        IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='Ratings' AND xtype='U')
-        BEGIN
-            CREATE TABLE Ratings (
-                RatingId INT PRIMARY KEY IDENTITY(1,1),
-                StudentId INT FOREIGN KEY REFERENCES Students(StudentId),
-                SubjectId INT,
-                Grade DECIMAL(18, 2)
-            );
-        END;
-    ";
-
-            using (SqlCommand command = new SqlCommand(createTablesQuery, connection))
-            {
-                command.ExecuteNonQuery();
-            }
-        }
-
-        private void InsertMockData()
-        {
-            string insertFacultiesQuery = "INSERT INTO Faculties (Name) VALUES ";
-            insertFacultiesQuery += "('Biologic'), ('Medical'), ('Economical'), ('MathAndDigitalTech'), ('Geographic');";
-
-            using (SqlCommand command = new SqlCommand(insertFacultiesQuery, connection))
-            {
-                command.ExecuteNonQuery();
-            }
-
-            string insertCoursesQuery = "INSERT INTO Courses (CourseNumber) VALUES ";
-            insertCoursesQuery += "(1), (2), (3), (4);";
-
-            using (SqlCommand command = new SqlCommand(insertCoursesQuery, connection))
-            {
-                command.ExecuteNonQuery();
-            }
-
-            string insertStudentsQuery = @"
-            INSERT INTO Students (FirstName, LastName, Gender, Scholarship, FacultyId, CourseId) VALUES
-            ('Olena', 'Shevchenko', 'Female', 1400, 1, 1),
-            ('Iryna', 'Kovalenko', 'Female', 1890, 1, 3),
-            ('Andriy', 'Lysenko', 'Male', 0, 2, 4),
-            ('Kateryna', 'Melnyk', 'Female', 1000, 3, 2),
-            ('Svitlana', 'Hrytsenko', 'Female', 0, 4, 1),
-            ('Dmytro', 'Moroz', 'Male', 1500, 4, 2),
-            ('Oleksandr', 'Tkachenko', 'Male', 100, 5, 4),
-            ('Viktoria', 'Bondarenko', 'Female', 500, 4, 3),
-            ('Mariia', 'Krutyi', 'Female', 700, 1, 1),
-            ('Petro', 'Voronin', 'Male', 1200, 4, 1),
-            ('Mykola', 'Vasylenko', 'Male', 0, 2, 1);";
-
-            using (SqlCommand command = new SqlCommand(insertStudentsQuery, connection))
-            {
-                command.ExecuteNonQuery();
-            }
-
-            string insertRatingsQuery = @"
-            INSERT INTO Ratings (StudentId, SubjectId, Grade) VALUES
-            (1, 1, 4.5), (1, 2, 4.0),
-            (2, 1, 4.5), (2, 2, 4.0),
-            (3, 1, 2.0), (3, 2, 4.0),
-            (4, 1, 4.5), (4, 2, 4.0),
-            (5, 1, 2.0), (5, 2, 1.5),
-            (6, 1, 4.5), (6, 2, 4.5),
-            (7, 1, 3.5), (7, 2, 3.5),
-            (8, 1, 2.5), (8, 2, 4.0),
-            (9, 1, 2.5), (9, 2, 4.0),
-            (10, 1, 4.0), (10, 2, 4.0),
-            (11, 1, 1.5), (11, 2, 2.0);";
-
-            using (SqlCommand command = new SqlCommand(insertRatingsQuery, connection))
-            {
-                command.ExecuteNonQuery();
-            }
-
-            Console.WriteLine("Дані успішно додані до таблиць.");
-        }
         #endregion
     }
 }

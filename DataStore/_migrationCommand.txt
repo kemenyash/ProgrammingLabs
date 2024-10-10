@@ -1,0 +1,15 @@
+﻿Команда міграції:
+dotnet-ef migrations add MigrationName -c DataContext -p DataStore -s StudentsManagement
+
+де:
+# MigrationName - назва міграції
+# DataContext - контекст даних на основі якого робимо міграцію
+# DataStore - проект, де знаходиться DataContext
+# Service -  сервіс, в якому наш DataContext використовується
+
+Траблшутинг
+В випадку, якщо крешиться і не стартує, бо нема референсу, запускаємо 
+dotnet tool install --global dotnet-ef
+
+Якщо є конфлікт версій між EF та EF Tool (використовується версія EF Tool нижча, ніж EF) використовуємо 
+dotnet tool  update --global dotnet-ef

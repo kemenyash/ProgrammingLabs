@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using DataStore;
+using Schemas;
 using StudentsManagement;
 
 public class StudentsPresentationHelper
@@ -13,85 +15,78 @@ public class StudentsPresentationHelper
 
     public void ShowAll()
     {
-        string query = @"
-            SELECT s.FirstName, s.LastName, s.Gender, s.Scholarship, c.CourseNumber, f.Name as Faculty
-            FROM Students s
-            JOIN Courses c ON s.CourseId = c.CourseId
-            JOIN Faculties f ON s.FacultyId = f.FacultyId";
+       
+        var studentsOnCourses = dbHelper.StudentsOnCourses;
+        var scholarShips = dbHelper.Scholarships;
 
-        var students = dbHelper.ExecuteSelectQuery(query);
-
-        foreach (var student in students)
+        foreach (var studentOnCourse in studentsOnCourses)
         {
-            Console.WriteLine($"Full name: {student["FirstName"]} {student["LastName"]}");
-            Console.WriteLine($"Gender: {student["Gender"]}");
-            Console.WriteLine($"Course: {student["CourseNumber"]}");
-            Console.WriteLine($"Faculty: {student["Faculty"]}");
-            Console.WriteLine($"Scholarship: {student["Scholarship"]}\r\n\r\n");
+            var student = studentOnCourse.Student;
+            var course = studentOnCourse.Course;
+            var faculty = course.Faculty;
+            var scholarShip = scholarShips.Where(x => x.StudentId == student.Id).FirstOrDefault();
+
+            Console.WriteLine($"Full name: {student.FirstName} {student.LastName}");
+            Console.WriteLine($"Gender: {student.Gender.ToString()}");
+            Console.WriteLine($"Course: {course.Value}");
+            Console.WriteLine($"Faculty: {faculty.Name}");
+            Console.WriteLine($"Scholarship: {scholarShip.Value}\r\n\r\n");
         }
     }
 
-    public void ShowRatingAndScholarship(string lastName)
+    public void ShowAssesmentAndScholarship(string lastName)
     {
-        string query = @"
-            SELECT s.FirstName, s.LastName, s.Scholarship, r.Grade
-            FROM Students s
-            LEFT JOIN Ratings r ON s.StudentId = r.StudentId
-            WHERE s.LastName = @LastName";
-
-        var parameters = new Dictionary<string, object>
-        {
-            { "@LastName", lastName }
-        };
-
-        var students = dbHelper.ExecuteSelectQuery(query, parameters);
-
-        if (students.Count == 0)
+        var studentScholarship = dbHelper.Scholarships.FirstOrDefault(x => x.Student.FirstName.ToLower() == lastName.ToLower());
+        var assesments = dbHelper.Assesments.Where(x => x.StudentId == studentScholarship.StudentId).Select(x => x.Value);
+        
+        if(studentScholarship is null)
         {
             Console.WriteLine("Student not found");
+            return;
         }
-        else
-        {
-            foreach (var student in students)
-            {
-                Console.WriteLine($"Rating of student {student["FirstName"]} {student["LastName"]}: {student["Grade"]}");
-                Console.WriteLine($"Scholarship: {student["Scholarship"]}\r\n\r\n");
-            }
-        }
+        var student = studentScholarship.Student;
+
+        Console.WriteLine($"Assesments of student {student.FirstName} {student.LastName}: {string.Join(",", assesments)}");
+        Console.WriteLine($"Scholarship: {studentScholarship.Value}\r\n\r\n");
+
     }
 
-    public void ShowStudents(string faculty, int course, decimal rating, string gender)
+    public void ShowGoodStudents(string faculty, int course, Gender gender)
     {
-        string query = @"
-            SELECT s.FirstName, s.LastName
-            FROM Students s
-            JOIN Faculties f ON s.FacultyId = f.FacultyId
-            JOIN Courses c ON s.CourseId = c.CourseId
-            LEFT JOIN Ratings r ON s.StudentId = r.StudentId
-            WHERE f.Name = @Faculty AND c.CourseNumber = @Course AND r.Grade = @Rating AND s.Gender = @Gender";
 
-        var parameters = new Dictionary<string, object>
-        {
-            { "@Faculty", faculty },
-            { "@Course", course },
-            { "@Rating", rating },
-            { "@Gender", gender }
-        };
+        var studentsOnCourse = dbHelper.StudentsOnCourses.Where(x => x.Student.Gender == gender &&
+                                                                x.Course.Faculty.Name.ToLower() == faculty.ToLower()
+                                                                && x.Course.Value == course);
 
-        var students = dbHelper.ExecuteSelectQuery(query, parameters);
-
-        if (students.Count == 0)
+        if (studentsOnCourse is null || !studentsOnCourse.Any())
         {
             Console.WriteLine("Students not found on faculty and course");
+            return;
         }
-        else
+
+        //критерієм відмінника є наявність стипендії, тому ми можемо пошукати співпадіння в таблиці з стипендіями
+        var goodStudents = new List<Student>();
+        foreach(var studentOnCourse in studentsOnCourse)
         {
-            var studentNames = new List<string>();
-            foreach (var student in students)
+            if(dbHelper.Scholarships.Any(x => x.StudentId == studentOnCourse.StudentId))
             {
-                studentNames.Add($"{student["FirstName"]} {student["LastName"]}");
+                goodStudents.Add(studentOnCourse.Student);
             }
-            Console.WriteLine($"Students on faculty {faculty} and {course} course with rating {rating}: {string.Join(", ", studentNames)}");
+
         }
+
+        if (goodStudents.Any()) 
+        {
+            Console.WriteLine("Good students not found on faculty and course");
+            return;
+        }
+
+        //виводимо відмінників
+        var studentNames = new List<string>();
+        foreach (var student in goodStudents)
+        {
+            studentNames.Add($"{student.FirstName} {student.LastName}");
+        }
+        Console.WriteLine($"Good students on faculty {faculty} and {course}: {string.Join(", ", studentNames)}");
     }
 }
