@@ -19,6 +19,12 @@ public class StudentsPresentationHelper
         var studentsOnCourses = dbHelper.StudentsOnCourses;
         var scholarShips = dbHelper.Scholarships;
 
+        if(!studentsOnCourses.Any() || !scholarShips.Any())
+        {
+            Console.WriteLine("Database is empty, please init data");
+            return;
+        }
+
         foreach (var studentOnCourse in studentsOnCourses)
         {
             var student = studentOnCourse.Student;
@@ -30,24 +36,42 @@ public class StudentsPresentationHelper
             Console.WriteLine($"Gender: {student.Gender.ToString()}");
             Console.WriteLine($"Course: {course.Value}");
             Console.WriteLine($"Faculty: {faculty.Name}");
-            Console.WriteLine($"Scholarship: {scholarShip.Value}\r\n\r\n");
+            if (scholarShip?.Value != null)
+            {
+                Console.WriteLine($"Scholarship: {scholarShip.Value}");
+            }
+            Console.WriteLine("\r\n\r\n");
         }
     }
 
-    public void ShowAssesmentAndScholarship(string lastName)
+    public void ShowAssesmentAndScholarship(string firstName)
     {
-        var studentScholarship = dbHelper.Scholarships.FirstOrDefault(x => x.Student.FirstName.ToLower() == lastName.ToLower());
-        var assesments = dbHelper.Assesments.Where(x => x.StudentId == studentScholarship.StudentId).Select(x => x.Value);
-        
-        if(studentScholarship is null)
+        //шукаємо студента по прізвищі
+        var student = dbHelper.Students.FirstOrDefault(x => x.FirstName.ToLower() == firstName.ToLower());
+
+        if(student is null)
         {
-            Console.WriteLine("Student not found");
+            //виводимо відповідне повідомлення, якщо не знайшли
+            Console.WriteLine("Students not found");
             return;
         }
-        var student = studentScholarship.Student;
 
+        //зберігаємо собі оцінки студента та перевіряємо чи є студент в таблиці зі стипедіантами
+        var assesments = dbHelper.Assesments.Where(x => x.StudentId == student.Id).Select(a => (int)a.Value);
+        var scholarship = dbHelper.Scholarships.FirstOrDefault(x => x.StudentId == student.Id);
+
+        //виводимо оцінки через кому
         Console.WriteLine($"Assesments of student {student.FirstName} {student.LastName}: {string.Join(",", assesments)}");
-        Console.WriteLine($"Scholarship: {studentScholarship.Value}\r\n\r\n");
+
+        //перевіряємо наявність стипендії
+        if (scholarship != null)
+        {
+            Console.WriteLine($"Scholarship: {scholarship.Value}\r\n\r\n");
+        }
+        else
+        {
+            Console.WriteLine($"Student without scholarship\r\n\r\n");
+        }
 
     }
 
@@ -75,7 +99,8 @@ public class StudentsPresentationHelper
 
         }
 
-        if (goodStudents.Any()) 
+        //якщо відмінників нема - повідомляємо про це
+        if (!goodStudents.Any()) 
         {
             Console.WriteLine("Good students not found on faculty and course");
             return;
@@ -87,6 +112,6 @@ public class StudentsPresentationHelper
         {
             studentNames.Add($"{student.FirstName} {student.LastName}");
         }
-        Console.WriteLine($"Good students on faculty {faculty} and {course}: {string.Join(", ", studentNames)}");
+        Console.WriteLine($"Good students on faculty {faculty} and course {course}: {string.Join(", ", studentNames)}");
     }
 }
