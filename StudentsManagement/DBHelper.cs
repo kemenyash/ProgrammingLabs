@@ -141,9 +141,7 @@ namespace StudentsManagement
 
         private async Task StudentsInit()
         {
-            try
-            {
-                var studentsMaleMock = new Dictionary<string, string>
+            var studentsMaleMock = new Dictionary<string, string>
                 {
                     { "Koval", "Ivan" },
                     { "Marchuk", "Stepan" },
@@ -152,7 +150,7 @@ namespace StudentsManagement
                     { "Hromovych", "Andriy" },
                 };
 
-                var studentsFemaleMock = new Dictionary<string, string>
+            var studentsFemaleMock = new Dictionary<string, string>
                 {
                     { "Koval", "Ivanna" },
                     { "Marchuk", "Stepanida" },
@@ -161,62 +159,57 @@ namespace StudentsManagement
                     { "Hromovych", "Andriana" },
                 };
 
-                List<Student> studentsMaleData;
-                List<Student> studentsFemaleData;
-                var studentsData = new List<Student>();
+            List<Student> studentsMaleData;
+            List<Student> studentsFemaleData;
+            var studentsData = new List<Student>();
 
-                // Контекст 1: Додаємо студентів
+            // Контекст 1: Додаємо студентів
+            using (var dataContext = new DataContext())
+            {
+                studentsMaleData = studentsMaleMock.Select(x => new Student
+                {
+                    FirstName = x.Key,
+                    LastName = x.Value,
+                    Gender = Schemas.Gender.Male
+                }).ToList();
+
+                studentsFemaleData = studentsFemaleMock.Select(x => new Student
+                {
+                    Gender = Schemas.Gender.Female,
+                    FirstName = x.Key,
+                    LastName = x.Value,
+                }).ToList();
+
+
+                studentsData.AddRange(studentsMaleData);
+                studentsData.AddRange(studentsFemaleData);
+
+                await dataContext.Students.AddRangeAsync(studentsData);
+                await dataContext.SaveChangesAsync();
+            }
+
+            // Контекст 2: Отримуємо ідентифікатори збережених студентів і додаємо їх до курсів
+
+            var courcesIds = new List<int>();
+
+            using (var dataContext = new DataContext())
+            {
+                courcesIds = dataContext.Courses.Select(x => x.Id).ToList();
+            }
+
+            foreach (var courseId in courcesIds)
+            {
                 using (var dataContext = new DataContext())
                 {
-                    studentsMaleData = studentsMaleMock.Select(x => new Student
+                    var studentsIds = studentsData.Select(x => new StudentsOnCourse
                     {
-                        FirstName = x.Key,
-                        LastName = x.Value,
-                        Gender = Schemas.Gender.Male
+                        CourseId = courseId,
+                        StudentId = x.Id
                     }).ToList();
 
-                    studentsFemaleData = studentsFemaleMock.Select(x => new Student
-                    {
-                        Gender = Schemas.Gender.Female,
-                        FirstName = x.Key,
-                        LastName = x.Value,
-                    }).ToList();
-
-                    
-                    studentsData.AddRange(studentsMaleData);
-                    studentsData.AddRange(studentsFemaleData);
-
-                    await dataContext.Students.AddRangeAsync(studentsData);
+                    await dataContext.StudentsOnCourses.AddRangeAsync(studentsIds);
                     await dataContext.SaveChangesAsync();
                 }
-
-                // Контекст 2: Отримуємо ідентифікатори збережених студентів і додаємо їх до курсів
-
-                var courcesIds = new List<int>();
-
-                using(var dataContext  = new DataContext())
-                {
-                    courcesIds = dataContext.Courses.Select(x => x.Id).ToList();
-                }
-
-                foreach (var courseId in courcesIds)
-                {
-                    using (var dataContext = new DataContext())
-                    {
-                        var studentsIds = studentsData.Select(x => new StudentsOnCourse
-                        {
-                            CourseId = courseId,
-                            StudentId = x.Id
-                        }).ToList();
-
-                        await dataContext.StudentsOnCourses.AddRangeAsync(studentsIds);
-                        await dataContext.SaveChangesAsync();
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex.Message);
             }
         }
 
@@ -225,99 +218,85 @@ namespace StudentsManagement
 
         private async Task AssesmentInit()
         {
-            try
+            var students = new List<Student>();
+            var assesmentValues = Enum.GetValues(typeof(Schemas.Assesment));
+
+            using (var dataContext = new DataContext())
             {
-                var students = new List<Student>();
-                var assesmentValues = Enum.GetValues(typeof(Schemas.Assesment));
+                students = dataContext.Students.ToList();
+            }
+
+            bool isOneGoodStudentAdded = false; //флажок для генерації одного гарантованого відмінника, так як в рандомі є вірогідність, що їх взагалі не буде
+
+            foreach (var student in students)
+            {
+                var assesments = new List<Schemas.Assesment>();
+                if (isOneGoodStudentAdded is false)
+                {
+                    isOneGoodStudentAdded = true;
+                    assesments.AddRange(new Schemas.Assesment[] { Schemas.Assesment.Good, Schemas.Assesment.Good, Schemas.Assesment.Good, Schemas.Assesment.Excelent, Schemas.Assesment.Good, });
+                }
+                else
+                {
+                    //вибираємо 5 рандомних оцінок в список
+                    for (int i = 0; i < 6; i++)
+                    {
+                        Random random = new Random();
+                        var assesment = (Schemas.Assesment)assesmentValues.GetValue(random.Next(assesmentValues.Length));
+                        assesments.Add(assesment);
+                    }
+                }
+
+
+                //пачкою зберігаємо оцінки студенту
+                var assesmentsData = assesments.Select(x => new DataStore.Assesment
+                {
+                    StudentId = student.Id,
+                    Value = x
+                });
 
                 using (var dataContext = new DataContext())
                 {
-                    students = dataContext.Students.ToList();
+                    await dataContext.Assesments.AddRangeAsync(assesmentsData);
+                    await dataContext.SaveChangesAsync();
                 }
 
-                bool isOneGoodStudentAdded = false; //флажок для генерації одного гарантованого відмінника, так як в рандомі є вірогідність, що їх взагалі не буде
-
-                foreach (var student in students)
-                {
-                    var assesments = new List<Schemas.Assesment>();
-                    if (isOneGoodStudentAdded is false)
-                    {
-                        isOneGoodStudentAdded = true;
-                        assesments.AddRange(new Schemas.Assesment[] { Schemas.Assesment.Good, Schemas.Assesment.Good, Schemas.Assesment.Good, Schemas.Assesment.Excelent, Schemas.Assesment.Good, });
-                    }
-                    else
-                    {
-                        //вибираємо 5 рандомних оцінок в список
-                        for (int i = 0; i < 6; i++)
-                        {
-                            Random random = new Random();
-                            var assesment = (Schemas.Assesment)assesmentValues.GetValue(random.Next(assesmentValues.Length));
-                            assesments.Add(assesment);
-                        }
-                    }
-
-
-                    //пачкою зберігаємо оцінки студенту
-                    var assesmentsData = assesments.Select(x => new DataStore.Assesment
-                    {
-                        StudentId = student.Id,
-                        Value = x
-                    });
-
-                    using (var dataContext = new DataContext())
-                    {
-                        await dataContext.Assesments.AddRangeAsync(assesmentsData);
-                        await dataContext.SaveChangesAsync();
-                    }
-
-                }
-            }
-            catch (Exception ex) 
-            {
-                
             }
         }
 
         private async Task ScholarshipInit()
         {
             var scholarships = new List<Scholarship>();
-            try
+            //всім студентам, які мають середній бал 4 і вище - даємо стипендію і відповідно додаємо в таблицю
+            var students = new List<Student>();
+            using (var dataContext = new DataContext())
             {
-                //всім студентам, які мають середній бал 4 і вище - даємо стипендію і відповідно додаємо в таблицю
-                var students = new List<Student>();
+                students = dataContext.Students.ToList();
+            }
+
+
+            foreach (var student in students)
+            {
                 using (var dataContext = new DataContext())
                 {
-                    students = dataContext.Students.ToList();
-                }
+                    var assesments = dataContext.Assesments.Where(x => x.StudentId == student.Id).Select(a => a.Value);
+                    var average = assesments.Average(a => (int)a);
 
-
-                foreach (var student in students)
-                {
-                    using (var dataContext = new DataContext())
+                    if (average > 4)
                     {
-                        var assesments = dataContext.Assesments.Where(x => x.StudentId == student.Id).Select(a => a.Value);
-                        var average = assesments.Average(a => (int)a);
 
-                        if (average > 4)
+                        scholarships.Add(new Scholarship
                         {
-
-                            scholarships.Add(new Scholarship
-                            {
-                                StudentId = student.Id,
-                                Value = 1500
-                            });
-                        }
+                            StudentId = student.Id,
+                            Value = 1500
+                        });
                     }
                 }
-                using (var dataContext = new DataContext())
-                {
-                    await dataContext.AddRangeAsync(scholarships);
-                    await dataContext.SaveChangesAsync();
-                }
             }
-            catch (Exception ex) 
+            using (var dataContext = new DataContext())
             {
-                
+                await dataContext.AddRangeAsync(scholarships);
+                await dataContext.SaveChangesAsync();
             }
         }
 
